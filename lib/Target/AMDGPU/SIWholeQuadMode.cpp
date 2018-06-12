@@ -219,6 +219,13 @@ char SIWholeQuadMode::scanInstructions(MachineFunction &MF,
       markInstruction(MI, Flags, Worklist);
       GlobalFlags |= Flags;
     }
+
+    if (WQMOutputs && MBB.succ_empty()) {
+      // This is a prolog shader. Make sure we go back to exact mode at the end.
+      Blocks[&MBB].OutNeeds = StateExact;
+      Worklist.push_back(&MBB);
+      GlobalFlags |= StateExact;
+    }
   }
 
   return GlobalFlags;

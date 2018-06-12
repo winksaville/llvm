@@ -1,7 +1,7 @@
 // REQUIRES: x86_64-linux
 // RUN: %host_cc -O0 -g %s -o %t 2>&1
 // RUN: %t 2>&1 | llvm-symbolizer -print-source-context-lines=5 -obj=%t | FileCheck %s
-
+// XFAIL: *
 #include <stdio.h>
 
 int inc(int a) {

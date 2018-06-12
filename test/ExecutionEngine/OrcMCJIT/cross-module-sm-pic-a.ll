@@ -1,5 +1,5 @@
 ; RUN: %lli -jit-kind=orc-mcjit -extra-module=%p/Inputs/cross-module-b.ll -relocation-model=pic -code-model=small %s > /dev/null
-; XFAIL: mips-, mipsel-, i686, i386
+; XFAIL: *
 
 declare i32 @FB()
 

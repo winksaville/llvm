@@ -335,7 +335,7 @@ void Memory::InvalidateInstructionCache(const void *Addr,
   // FIXME: Can we safely always call this for __GNUC__ everywhere?
   const char *Start = static_cast<const char *>(Addr);
   const char *End = Start + Len;
-  __clear_cache(const_cast<char *>(Start), const_cast<char *>(End));
+  __builtin___clear_cache(const_cast<char *>(Start), const_cast<char *>(End));
 #  endif
 
 #endif  // end apple

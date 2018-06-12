@@ -189,15 +189,7 @@ class SimpleProgressBar:
             return
 
         for i in range(self.atIndex, next):
-            idx = i % 5
-            if idx == 0:
-                sys.stdout.write('%-2d' % (i*2))
-            elif idx == 1:
-                pass # Skip second char
-            elif idx < 4:
-                sys.stdout.write('.')
-            else:
-                sys.stdout.write(' ')
+            sys.stdout.write('%-2d ' % (i*2))
         sys.stdout.flush()
         self.atIndex = next
 

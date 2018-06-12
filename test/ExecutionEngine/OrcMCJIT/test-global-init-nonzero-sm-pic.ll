@@ -1,5 +1,5 @@
 ; RUN: %lli -jit-kind=orc-mcjit -relocation-model=pic -code-model=small %s > /dev/null
-; XFAIL: mips-, mipsel-, aarch64, arm, i686, i386
+; XFAIL: *
 
 @count = global i32 1, align 4
 

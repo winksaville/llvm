@@ -2036,6 +2036,10 @@ public:
     OS << " " << LLVM_VERSION_INFO;
 #endif
     OS << "\n  ";
+#ifdef LLVM_DEBIAN_INFO
+    OS << LLVM_DEBIAN_INFO;
+#endif
+    OS << "\n  ";
 #ifndef __OPTIMIZE__
     OS << "DEBUG build";
 #else

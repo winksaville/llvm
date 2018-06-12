@@ -357,7 +357,7 @@ void RuntimeDyldELF::resolveAArch64Relocation(const SectionEntry &Section,
     // bits affected by the relocation on entry is garbage.
     *TargetPtr &= 0xffe0001fU;
     // Immediate goes in bits 20:5 of MOVZ/MOVK instruction
-    *TargetPtr |= Result >> (48 - 5);
+    *TargetPtr |= (Result & 0xffff000000000000ULL) >> (48 - 5);
     // Shift must be "lsl #48", in bits 22:21
     assert((*TargetPtr >> 21 & 0x3) == 3 && "invalid shift for relocation");
     break;

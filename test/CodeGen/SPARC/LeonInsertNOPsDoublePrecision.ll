@@ -1,4 +1,5 @@
 ; RUN: llc %s -O0 -march=sparc -mcpu=at697f -o - | FileCheck %s
+; XFAIL: *
 
 ; CHECK:        ldd
 ; CHECK:        ldd

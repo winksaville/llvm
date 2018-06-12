@@ -41,6 +41,11 @@
 #include <string>
 #include <tuple>
 
+// For GNU Hurd
+#if defined(__GNU__) && !defined(PATH_MAX)
+# define PATH_MAX 4096
+#endif
+
 namespace llvm {
 namespace dsymutil {
 
