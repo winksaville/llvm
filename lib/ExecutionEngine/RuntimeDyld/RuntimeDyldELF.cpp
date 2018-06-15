@@ -213,12 +213,15 @@ void RuntimeDyldELF::deregisterEHFrames() {
 
 std::unique_ptr<RuntimeDyld::LoadedObjectInfo>
 RuntimeDyldELF::loadObject(const object::ObjectFile &O) {
-  if (auto ObjSectionToIDOrErr = loadObjectImpl(O))
+  fprintf(stderr, "RuntimeDyldELF::loadObject:+\n");
+  if (auto ObjSectionToIDOrErr = loadObjectImpl(O)) {
+    fprintf(stderr, "RuntimeDyldELF::loadObject:- OK\n");
     return llvm::make_unique<LoadedELFObjectInfo>(*this, *ObjSectionToIDOrErr);
-  else {
+  } else {
     HasError = true;
     raw_string_ostream ErrStream(ErrorStr);
     logAllUnhandledErrors(ObjSectionToIDOrErr.takeError(), ErrStream, "");
+    fprintf(stderr, "RuntimeDyldELF::loadObject:- Error\n");
     return nullptr;
   }
 }
@@ -1196,41 +1199,77 @@ RuntimeDyldELF::processRelocationRef(
   ErrorOr<int64_t> AddendOrErr = ELFRelocationRef(*RelI).getAddend();
   int64_t Addend = AddendOrErr ? *AddendOrErr : 0;
   elf_symbol_iterator Symbol = RelI->getSymbol();
+  fprintf(stderr, "RuntimeDyldELF::processRelocationRef:+ rebuild\n");
+
+  fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A\n");
 
   // Obtain the symbol name which is referenced in the relocation
   StringRef TargetName;
+  {
   if (Symbol != Obj.symbol_end()) {
-    if (auto TargetNameOrErr = Symbol->getName())
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A-1\n");
+    if (auto TargetNameOrErr = Symbol->getName()) {
+      {
+      bool result;
+      if (TargetNameOrErr) {
+        result = true;
+      } else {
+        result = false;
+      }
+      fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A-2 TargetNameOrErr.bool result=%d\n", result);
       TargetName = *TargetNameOrErr;
-    else
+      fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A-3\n");
+      }
+      fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A-3.1\n");
+    } else {
+      fprintf(stderr, "RuntimeDyldELF::processRelocationRef:- 1\n");
       return TargetNameOrErr.takeError();
+    }
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A-3.2\n");
   }
+  fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A-3.3\n");
+  }
+
+  fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A-4\n");
   DEBUG(dbgs() << "\t\tRelType: " << RelType << " Addend: " << Addend
                << " TargetName: " << TargetName << "\n");
   RelocationValueRef Value;
+  fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A-5\n");
   // First search for the symbol in the local symbol table
   SymbolRef::Type SymType = SymbolRef::ST_Unknown;
 
+  fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A-6\n");
+
   // Search for the symbol in the global symbol table
   RTDyldSymbolTable::const_iterator gsi = GlobalSymbolTable.end();
+  fprintf(stderr, "RuntimeDyldELF::processRelocationRef: A-7\n");
   if (Symbol != Obj.symbol_end()) {
-    gsi = GlobalSymbolTable.find(TargetName.data());
-    Expected<SymbolRef::Type> SymTypeOrErr = Symbol->getType();
-    if (!SymTypeOrErr) {
-      std::string Buf;
-      raw_string_ostream OS(Buf);
-      logAllUnhandledErrors(SymTypeOrErr.takeError(), OS, "");
-      OS.flush();
-      report_fatal_error(Buf);
+    {
+      gsi = GlobalSymbolTable.find(TargetName.data());
+      Expected<SymbolRef::Type> SymTypeOrErr = Symbol->getType();
+      fprintf(stderr, "RuntimeDyldELF::processRelocationRef: Constructed SymTypeOrErr\n");
+      if (!SymTypeOrErr) {
+        fprintf(stderr, "RuntimeDyldELF::processRelocationRef:  !SymTypeOrErr was true so a fatal_error\n");
+        std::string Buf;
+        raw_string_ostream OS(Buf);
+        logAllUnhandledErrors(SymTypeOrErr.takeError(), OS, "");
+        OS.flush();
+        report_fatal_error(Buf);
+      }
+      fprintf(stderr, "RuntimeDyldELF::processRelocationRef: no error, copy SymTypeOrErr\n");
+      SymType = *SymTypeOrErr;
+      fprintf(stderr, "RuntimeDyldELF::processRelocationRef: no error, copied SymTypeOrErr\n");
     }
-    SymType = *SymTypeOrErr;
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: maybe destroyed SymTypeOrErr\n");
   }
   if (gsi != GlobalSymbolTable.end()) {
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: B\n");
     const auto &SymInfo = gsi->second;
     Value.SectionID = SymInfo.getSectionID();
     Value.Offset = SymInfo.getOffset();
     Value.Addend = SymInfo.getOffset() + Addend;
   } else {
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: C\n");
     switch (SymType) {
     case SymbolRef::ST_Debug: {
       // TODO: Now ELF SymbolRef::ST_Debug = STT_SECTION, it's not obviously
@@ -1252,8 +1291,10 @@ RuntimeDyldELF::processRelocationRef(
       if (auto SectionIDOrErr = findOrEmitSection(Obj, (*si), isCode,
                                                   ObjSectionToID))
         Value.SectionID = *SectionIDOrErr;
-      else
+      else {
+        fprintf(stderr, "RuntimeDyldELF::processRelocationRef:- 2\n");
         return SectionIDOrErr.takeError();
+      }
       Value.Addend = Addend;
       break;
     }
@@ -1276,6 +1317,7 @@ RuntimeDyldELF::processRelocationRef(
     }
   }
 
+  fprintf(stderr, "RuntimeDyldELF::processRelocationRef: D\n");
   uint64_t Offset = RelI->getOffset();
 
   DEBUG(dbgs() << "\t\tSectionID: " << SectionID << " Offset: " << Offset
@@ -1283,6 +1325,7 @@ RuntimeDyldELF::processRelocationRef(
   if ((Arch == Triple::aarch64 || Arch == Triple::aarch64_be) &&
       (RelType == ELF::R_AARCH64_CALL26 || RelType == ELF::R_AARCH64_JUMP26)) {
     // This is an AArch64 branch relocation, need to use a stub function.
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: E\n");
     DEBUG(dbgs() << "\t\tThis is an AArch64 branch relocation.");
     SectionEntry &Section = Sections[SectionID];
 
@@ -1331,6 +1374,7 @@ RuntimeDyldELF::processRelocationRef(
       Section.advanceStubOffset(getMaxStubSize());
     }
   } else if (Arch == Triple::arm) {
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: F\n");
     if (RelType == ELF::R_ARM_PC24 || RelType == ELF::R_ARM_CALL ||
       RelType == ELF::R_ARM_JUMP24) {
       // This is an ARM branch relocation, need to use a stub function.
@@ -1377,6 +1421,7 @@ RuntimeDyldELF::processRelocationRef(
       processSimpleRelocation(SectionID, Offset, RelType, Value);
     }
   } else if (IsMipsO32ABI) {
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: G\n");
     uint8_t *Placeholder = reinterpret_cast<uint8_t *>(
         computePlaceholderAddress(SectionID, Offset));
     uint32_t Opcode = readBytesUnaligned(Placeholder, 4);
@@ -1469,6 +1514,7 @@ RuntimeDyldELF::processRelocationRef(
       processSimpleRelocation(SectionID, Offset, RelType, Value);
     }
   } else if (IsMipsN64ABI) {
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: H\n");
     uint32_t r_type = RelType & 0xff;
     RelocationEntry RE(SectionID, Offset, RelType, Value.Addend);
     if (r_type == ELF::R_MIPS_CALL16 || r_type == ELF::R_MIPS_GOT_PAGE
@@ -1486,6 +1532,7 @@ RuntimeDyldELF::processRelocationRef(
     else
       addRelocationForSection(RE, Value.SectionID);
   } else if (Arch == Triple::ppc64 || Arch == Triple::ppc64le) {
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: I\n");
     if (RelType == ELF::R_PPC64_REL24) {
       // Determine ABI variant in use for this object.
       unsigned AbiVariant;
@@ -1502,8 +1549,10 @@ RuntimeDyldELF::processRelocationRef(
           // In the ELFv1 ABI, a function call may point to the .opd entry,
           // so the final symbol value is calculated based on the relocation
           // values in the .opd section.
-          if (auto Err = findOPDEntrySection(Obj, ObjSectionToID, Value))
+          if (auto Err = findOPDEntrySection(Obj, ObjSectionToID, Value)) {
+            fprintf(stderr, "RuntimeDyldELF::processRelocationRef:- 3\n");
             return std::move(Err);
+          }
         } else {
           // In the ELFv2 ABI, a function symbol may provide a local entry
           // point, which must be used for direct calls.
@@ -1615,8 +1664,10 @@ RuntimeDyldELF::processRelocationRef(
       }
 
       RelocationValueRef TOCValue;
-      if (auto Err = findPPC64TOCSection(Obj, ObjSectionToID, TOCValue))
+      if (auto Err = findPPC64TOCSection(Obj, ObjSectionToID, TOCValue)) {
+        fprintf(stderr, "RuntimeDyldELF::processRelocationRef:- 4\n");
         return std::move(Err);
+      }
       if (Value.SymbolName || Value.SectionID != TOCValue.SectionID)
         llvm_unreachable("Unsupported TOC relocation.");
       Value.Addend -= TOCValue.Addend;
@@ -1628,11 +1679,15 @@ RuntimeDyldELF::processRelocationRef(
       // symbols (in which case the addend is respected).
       if (RelType == ELF::R_PPC64_TOC) {
         RelType = ELF::R_PPC64_ADDR64;
-        if (auto Err = findPPC64TOCSection(Obj, ObjSectionToID, Value))
+        if (auto Err = findPPC64TOCSection(Obj, ObjSectionToID, Value)) {
+          fprintf(stderr, "RuntimeDyldELF::processRelocationRef:- 5\n");
           return std::move(Err);
+        }
       } else if (TargetName == ".TOC.") {
-        if (auto Err = findPPC64TOCSection(Obj, ObjSectionToID, Value))
+        if (auto Err = findPPC64TOCSection(Obj, ObjSectionToID, Value)) {
+          fprintf(stderr, "RuntimeDyldELF::processRelocationRef:- 6\n");
           return std::move(Err);
+        }
         Value.Addend += Addend;
       }
 
@@ -1645,6 +1700,7 @@ RuntimeDyldELF::processRelocationRef(
     }
   } else if (Arch == Triple::systemz &&
              (RelType == ELF::R_390_PLT32DBL || RelType == ELF::R_390_GOTENT)) {
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: J\n");
     // Create function stubs for both PLT and GOT references, regardless of
     // whether the GOT reference is to data or code.  The stub contains the
     // full address of the symbol, as needed by GOT references, and the
@@ -1691,6 +1747,7 @@ RuntimeDyldELF::processRelocationRef(
     else
       resolveRelocation(Section, Offset, StubAddress, RelType, Addend);
   } else if (Arch == Triple::x86_64) {
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: K\n");
     if (RelType == ELF::R_X86_64_PLT32) {
       // The way the PLT relocations normally work is that the linker allocates
       // the
@@ -1775,11 +1832,13 @@ RuntimeDyldELF::processRelocationRef(
       processSimpleRelocation(SectionID, Offset, RelType, Value);
     }
   } else {
+    fprintf(stderr, "RuntimeDyldELF::processRelocationRef: L\n");
     if (Arch == Triple::x86) {
       Value.Addend += support::ulittle32_t::ref(computePlaceholderAddress(SectionID, Offset));
     }
     processSimpleRelocation(SectionID, Offset, RelType, Value);
   }
+  fprintf(stderr, "RuntimeDyldELF::processRelocationRef:-\n");
   return ++RelI;
 }
 

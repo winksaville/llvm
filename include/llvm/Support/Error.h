@@ -14,6 +14,12 @@
 #ifndef LLVM_SUPPORT_ERROR_H
 #define LLVM_SUPPORT_ERROR_H
 
+#ifdef NDEBUG
+#pragma message "Error.h: NDEBUG is defined"
+#else
+#pragma message "Error.h: NDEBUG is NOT defined"
+#endif
+
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
@@ -209,6 +215,7 @@ public:
   /// it will be considered checked.
   explicit operator bool() {
     setChecked(getPtr() == nullptr);
+    fprintf(stderr, "Error.bool():-%d\n", getPtr() != nullptr);
     return getPtr() != nullptr;
   }
 
@@ -220,6 +227,8 @@ public:
 private:
   void assertIsChecked() {
 #ifndef NDEBUG
+#  pragma message "Error.assertIsChecked: NDEBUG is NOT defined"
+    fprintf(stderr, "Error.assertIsChecked: getPtr=%p getChecked=%d\n", getPtr(), getChecked());
     if (!getChecked() || getPtr()) {
       dbgs() << "Program aborted due to an unhandled Error:\n";
       if (getPtr())
@@ -230,6 +239,8 @@ private:
                "checked prior to being destroyed).\n";
       abort();
     }
+#else
+#  pragma message "Error.assertIsChecked: NDEBUG is defined"
 #endif
   }
 
@@ -683,7 +694,9 @@ public:
   explicit operator bool() {
 #ifndef NDEBUG
     Checked = !HasError;
+    fprintf(stderr, "Expected.bool(): Checked=%d\n", Checked);
 #endif
+    fprintf(stderr, "Expected.bool(): HasError=%d\n", HasError);
     return !HasError;
   }
 
@@ -711,6 +724,7 @@ public:
   Error takeError() {
 #ifndef NDEBUG
     Checked = true;
+    fprintf(stderr, "Expected.takeError: HasError=%d Checked=%d\n", HasError, Checked);
 #endif
     return HasError ? Error(std::move(*getErrorStorage())) : Error::success();
   }
@@ -756,6 +770,7 @@ private:
 #ifndef NDEBUG
     Checked = false;
     Other.Checked = true;
+    fprintf(stderr, "Expected.moveConstruct: HasError=%d Checked=%d\n", HasError, Checked);
 #endif
 
     if (!HasError)
@@ -799,6 +814,8 @@ private:
 
   void assertIsChecked() {
 #ifndef NDEBUG
+#  pragma message "Expected.assertIsChecked: NDEBUG is NOT defined"
+    fprintf(stderr, "Expected.assertIsChecked: HasError=%d Checked=%d\n", HasError, Checked);
     if (!Checked) {
       dbgs() << "Expected<T> must be checked before access or destruction.\n";
       if (HasError) {
@@ -810,6 +827,9 @@ private:
                   "destroyed).\n";
       abort();
     }
+#else
+#  pragma message "Expected.assertIsChecked: NDEBUG is defined"
+   fprintf(stderr, "Expected.assertIsChecked: HasError=%d\n", HasError);
 #endif
   }
 

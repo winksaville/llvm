@@ -172,12 +172,15 @@ static Error getOffset(const SymbolRef &Sym, SectionRef Sec,
 
 Expected<RuntimeDyldImpl::ObjSectionToIDMap>
 RuntimeDyldImpl::loadObjectImpl(const object::ObjectFile &Obj) {
+  fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:+\n");
   MutexGuard locked(lock);
 
   // Save information about our target
   Arch = (Triple::ArchType)Obj.getArch();
   IsTargetLittleEndian = Obj.isLittleEndian();
   setMipsABI(Obj);
+
+  fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 1\n");
 
   // Compute the memory size required to load all sections to be loaded
   // and pass this information to the memory manager
@@ -193,36 +196,53 @@ RuntimeDyldImpl::loadObjectImpl(const object::ObjectFile &Obj) {
                                   RWDataSize, RWDataAlign);
   }
 
+  fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 2\n");
+
   // Used sections from the object file
   ObjSectionToIDMap LocalSections;
 
   // Common symbols requiring allocation, with their sizes and alignments
   CommonSymbolList CommonSymbols;
 
+  fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3\n");
+
   // Parse symbols
   DEBUG(dbgs() << "Parse symbols:\n");
   for (symbol_iterator I = Obj.symbol_begin(), E = Obj.symbol_end(); I != E;
        ++I) {
+    fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.1 top symbol loop\n");
     uint32_t Flags = I->getFlags();
 
     if (Flags & SymbolRef::SF_Common)
       CommonSymbols.push_back(*I);
     else {
+      fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.2 get symbol type\n");
 
       // Get the symbol type.
       object::SymbolRef::Type SymType;
-      if (auto SymTypeOrErr = I->getType())
+      fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.2.1 get symbol type\n");
+      if (auto SymTypeOrErr = I->getType()) {
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.2.2 get symbol type\n");
         SymType =  *SymTypeOrErr;
-      else
+      } else {
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- 3.2.3 SymTypeOrErr.takeError()\n");
         return SymTypeOrErr.takeError();
+      }
 
+      fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.3 get symbol name\n");
       // Get symbol name.
       StringRef Name;
-      if (auto NameOrErr = I->getName())
+      if (auto NameOrErr = I->getName()) {
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.3.1 get symbol name\n");
         Name = *NameOrErr;
-      else
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.3.1.1 get symbol name '%s'\n", Name.str().c_str());
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.3.1.2 get symbol name HERE\n");
+      } else {
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- 3.3.2 NameOrErr.takeError()\n");
         return NameOrErr.takeError();
+      }
 
+      fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.4 compute jit symbol flags\n");
       // Compute JIT symbol flags.
       JITSymbolFlags RTDyldSymFlags = JITSymbolFlags::None;
       if (Flags & SymbolRef::SF_Weak)
@@ -230,13 +250,17 @@ RuntimeDyldImpl::loadObjectImpl(const object::ObjectFile &Obj) {
       if (Flags & SymbolRef::SF_Exported)
         RTDyldSymFlags |= JITSymbolFlags::Exported;
 
+      fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.5 compute jit symbol flags\n");
+
       if (Flags & SymbolRef::SF_Absolute &&
           SymType != object::SymbolRef::ST_File) {
         uint64_t Addr = 0;
         if (auto AddrOrErr = I->getAddress())
           Addr = *AddrOrErr;
-        else
+        else {
+          fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- AddrOrErr.takeError()\n");
           return AddrOrErr.takeError();
+        }
 
         unsigned SectionID = AbsoluteSymbolSection;
 
@@ -254,8 +278,10 @@ RuntimeDyldImpl::loadObjectImpl(const object::ObjectFile &Obj) {
         section_iterator SI = Obj.section_end();
         if (auto SIOrErr = I->getSection())
           SI = *SIOrErr;
-        else
+        else {
+          fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- SIOrErr.takeError()\n");
           return SIOrErr.takeError();
+        }
 
         if (SI == Obj.section_end())
           continue;
@@ -270,8 +296,10 @@ RuntimeDyldImpl::loadObjectImpl(const object::ObjectFile &Obj) {
         if (auto SectionIDOrErr = findOrEmitSection(Obj, *SI, IsCode,
                                                     LocalSections))
           SectionID = *SectionIDOrErr;
-        else
+        else {
+          fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- SectionIDOrErr.takeError() 1\n");
           return SectionIDOrErr.takeError();
+        }
 
         DEBUG(dbgs() << "\tType: " << SymType << " Name: " << Name
                      << " SID: " << SectionID << " Offset: "
@@ -280,12 +308,20 @@ RuntimeDyldImpl::loadObjectImpl(const object::ObjectFile &Obj) {
         GlobalSymbolTable[Name] =
           SymbolTableEntry(SectionID, SectOffset, RTDyldSymFlags);
       }
+      fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.99 compute jit symbol flags\n");
     }
+    fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.100 btm symbol loop\n");
   }
 
+  fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 4\n");
+
   // Allocate common symbols
-  if (auto Err = emitCommonSymbols(Obj, CommonSymbols))
+  if (auto Err = emitCommonSymbols(Obj, CommonSymbols)) {
+    fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- emitCommonSymbols Err\n");
     return std::move(Err);
+  }
+
+  fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 5\n");
 
   // Parse and process relocations
   DEBUG(dbgs() << "Parse relocations:\n");
@@ -308,16 +344,20 @@ RuntimeDyldImpl::loadObjectImpl(const object::ObjectFile &Obj) {
     if (auto SectionIDOrErr = findOrEmitSection(Obj, *RelocatedSection, IsCode,
                                                 LocalSections))
       SectionID = *SectionIDOrErr;
-    else
+    else {
+      fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- SectionIDOrErr.takeError 2\n");
       return SectionIDOrErr.takeError();
+    }
 
     DEBUG(dbgs() << "\tSectionID: " << SectionID << "\n");
 
     for (; I != E;)
       if (auto IOrErr = processRelocationRef(SectionID, I, Obj, LocalSections, Stubs))
         I = *IOrErr;
-      else
+      else {
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- IOrErr\n");
         return IOrErr.takeError();
+      }
 
     // If there is an attached checker, notify it about the stubs for this
     // section so that they can be verified.
@@ -325,13 +365,18 @@ RuntimeDyldImpl::loadObjectImpl(const object::ObjectFile &Obj) {
       Checker->registerStubMap(Obj.getFileName(), SectionID, Stubs);
   }
 
+  fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 6\n");
+
   // Give the subclasses a chance to tie-up any loose ends.
-  if (auto Err = finalizeLoad(Obj, LocalSections))
+  if (auto Err = finalizeLoad(Obj, LocalSections)) {
+    fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- Err\n");
     return std::move(Err);
+  }
 
 //   for (auto E : LocalSections)
 //     llvm::dbgs() << "Added: " << E.first.getRawDataRefImpl() << " -> " << E.second << "\n";
 
+  fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- btm\n");
   return LocalSections;
 }
 

@@ -248,14 +248,32 @@ public:
   ObjSetHandleT addObjectSet(ObjSetT Objects,
                              MemoryManagerPtrT MemMgr,
                              SymbolResolverPtrT Resolver) {
+    fprintf(stderr, "addObjectSet:+\n");
 
     auto Finalizer = [&](ObjSetHandleT H, RuntimeDyld &RTDyld,
                          const ObjSetT &Objs,
                          std::function<void()> LOSHandleLoad) {
       LoadedObjInfoList LoadedObjInfos;
 
-      for (auto &Obj : Objs)
+      fprintf(stderr, "addObjectSet: loop over Objs\n");
+      int i = 0;
+      for (auto &Obj : Objs) {
+        fprintf(stderr, "addObjectSet: %d: top\n", i);
+#if 0
+        auto &the_obj = *Obj;
+        fprintf(stderr, "addObjectSet: %d: 1\n", i);
+        auto &this_getObject = this->getObject(the_obj);
+        fprintf(stderr, "addObjectSet: %d: 2\n", i);
+        std::unique_ptr<RuntimeDyld::LoadedObjectInfo> loi = RTDyld.loadObject(this_getObject);
+        fprintf(stderr, "addObjectSet: %d: 3 %p\n", i, loi.get());
+        LoadedObjInfos.push_back(std::move(loi));
+#else
         LoadedObjInfos.push_back(RTDyld.loadObject(this->getObject(*Obj)));
+#endif
+        fprintf(stderr, "addObjectSet: %d: btm\n", i);
+        i++;
+      }
+      fprintf(stderr, "addObjectSet: done loop over Objs\n");
 
       LOSHandleLoad();
 
@@ -267,18 +285,23 @@ public:
         this->NotifyFinalized(H);
     };
 
+    fprintf(stderr, "addObjectSet: set LOS\n");
     auto LOS =
       createLinkedObjectSet(std::move(Objects), std::move(MemMgr),
                             std::move(Resolver), std::move(Finalizer),
                             ProcessAllSections);
+    fprintf(stderr, "addObjectSet: LOSPtr = LOS.get\n");
     // LOS is an owning-ptr. Keep a non-owning one so that we can set the handle
     // below.
     auto *LOSPtr = LOS.get();
 
+    fprintf(stderr, "addObjectSet: Handle = LinkedObjSetList.insert\n");
     ObjSetHandleT Handle = LinkedObjSetList.insert(LinkedObjSetList.end(),
                                                    std::move(LOS));
+    fprintf(stderr, "addObjectSet: LOSPtr->setHandle\n");
     LOSPtr->setHandle(Handle);
 
+    fprintf(stderr, "addObjectSet:-\n");
     return Handle;
   }
 
