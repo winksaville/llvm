@@ -623,6 +623,11 @@ public:
         Checked(false)
 #endif
   {
+#ifndef NDEBUG
+    fprintf(stderr, "Expected(Error Err) NDEBUG NOT defined this=%p\n", this);
+#else
+    fprintf(stderr, "Expected(Error Err) NDEBUG is defined this=%p\n", this);
+#endif
     assert(Err && "Cannot create Expected<T> from Error success value.");
     new (getErrorStorage()) Error(std::move(Err));
   }
@@ -639,11 +644,23 @@ public:
         Checked(false)
 #endif
   {
+#ifndef NDEBUG
+    fprintf(stderr, "template Expected(OtherT &&, T*) OtherT Convertible to T, NDEBUG NOT defined this=%p\n", this);
+#else
+    fprintf(stderr, "template Expected(OtherT &&, T*) OtherT Convertible to T, NDEBUG is defined this=%p\n", this);
+#endif
     new (getStorage()) storage_type(std::forward<OtherT>(Val));
   }
 
   /// Move construct an Expected<T> value.
-  Expected(Expected &&Other) { moveConstruct(std::move(Other)); }
+  Expected(Expected &&Other) {
+#ifndef NDEBUG
+    fprintf(stderr, "Expected(Expected &&) NDEBUG NOT defined, moveConstructor this=%p\n", this);
+#else
+    fprintf(stderr, "Expected(Expected &&) NDEBUG is defined, moveConstructor this=%p\n", this);
+#endif
+    moveConstruct(std::move(Other));
+  }
 
   /// Move construct an Expected<T> value from an Expected<OtherT>, where OtherT
   /// must be convertible to T.
@@ -651,6 +668,11 @@ public:
   Expected(Expected<OtherT> &&Other,
            typename std::enable_if<std::is_convertible<OtherT, T>::value>::type
                * = nullptr) {
+#ifndef NDEBUG
+    fprintf(stderr, "template Expected(Expected<OtherT> &&, T*) OtherT convertible to T, NDEBUG NOT defined, moveConstructor this=%p\n", this);
+#else
+    fprintf(stderr, "template Expected(Expected<OtherT> &&, T*) OtherT convertible to T, NDEBUG is defined, movConstructor this=%p\n", this);
+#endif
     moveConstruct(std::move(Other));
   }
 
@@ -661,6 +683,11 @@ public:
       Expected<OtherT> &&Other,
       typename std::enable_if<!std::is_convertible<OtherT, T>::value>::type * =
           nullptr) {
+#ifndef NDEBUG
+    fprintf(stderr, "template Expected(Expected<OtherT> &&, T*) OtherT not convertible to T, NDEBUG NOT defined, moveConstructor  this=%p\n", this);
+#else
+    fprintf(stderr, "template Expected(Expected<OtherT> &&, T* ) OtherT not convertible to T, NDEBUG is defined, movConstructor this=%p\n", this);
+#endif
     moveConstruct(std::move(Other));
   }
 
@@ -672,6 +699,7 @@ public:
 
   /// Destroy an Expected<T>.
   ~Expected() {
+    fprintf(stderr, "Expected.~Expected this=%p\n", this);
     assertIsChecked();
     if (!HasError)
       getStorage()->~storage_type();
@@ -729,12 +757,14 @@ public:
 
   /// \brief Returns a reference to the stored T value.
   reference operator*() {
+    fprintf(stderr, "Expected::operator* this=%p\n", this);
     assertIsChecked();
     return *getStorage();
   }
 
   /// \brief Returns a const reference to the stored T value.
   const_reference operator*() const {
+    fprintf(stderr, "const_reference Expected::operator* const this=%p\n", this);
     assertIsChecked();
     return *getStorage();
   }
@@ -799,6 +829,7 @@ private:
 
   void assertIsChecked() {
 #ifndef NDEBUG
+    fprintf(stderr, "Expected.assertIsChecked: NDEBUG not defined this=%p\n", this);
     if (!Checked) {
       dbgs() << "Expected<T> must be checked before access or destruction.\n";
       if (HasError) {
@@ -810,6 +841,8 @@ private:
                   "destroyed).\n";
       abort();
     }
+#else
+    fprintf(stderr, "Expected.assertIsChecked: NDEBUG is defined this=%p\n", this);
 #endif
   }
 

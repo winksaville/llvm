@@ -170,6 +170,20 @@ static Error getOffset(const SymbolRef &Sym, SectionRef Sec,
   return Error::success();
 }
 
+StringRef __attribute__ ((noinline)) getName(symbol_iterator I) {
+      // Get symbol name.
+      fprintf(stderr, "RuntimeDyldImpl/getName:+\n");
+      StringRef Name = StringRef("<bad>");
+      if (auto NameOrErr = I->getName()) {
+        Name = *NameOrErr;
+      } else {
+        fprintf(stderr, "RuntimeDyldImpl/getName:- Aborting\n"); //NameOrErr.takeError()\n");
+        abort();//return NameOrErr.takeError();
+      }
+      fprintf(stderr, "RuntimeDyldImpl/getName:- name '%s'\n", Name.str().c_str());
+      return Name;
+}
+
 Expected<RuntimeDyldImpl::ObjSectionToIDMap>
 RuntimeDyldImpl::loadObjectImpl(const object::ObjectFile &Obj) {
   MutexGuard locked(lock);
@@ -218,10 +232,19 @@ RuntimeDyldImpl::loadObjectImpl(const object::ObjectFile &Obj) {
 
       // Get symbol name.
       StringRef Name;
-      if (auto NameOrErr = I->getName())
+#if 0
+      if (auto NameOrErr = I->getName()) {
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.3.1 get symbol name\n");
         Name = *NameOrErr;
-      else
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.3.1.1 get symbol name '%s'\n", Name.str().c_str());
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl: 3.3.1.2 get symbol name HERE\n");
+      } else {
+        fprintf(stderr, "RuntimeDyldImpl::loadObjectImpl:- 3.3.2 NameOrErr.takeError()\n");
         return NameOrErr.takeError();
+      }
+#else
+      Name = getName(I);
+#endif
 
       // Compute JIT symbol flags.
       JITSymbolFlags RTDyldSymFlags = JITSymbolFlags::None;
